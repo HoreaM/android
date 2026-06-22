@@ -95,6 +95,12 @@ class AutoTunnelViewModel(
         autoTunnelRepository.upsert(state.autoTunnelSettings.copy(isStopOnNoInternetEnabled = to))
     }
 
+    fun setStopOnServerUnreachableEnabled(to: Boolean) = intent {
+        autoTunnelRepository.upsert(
+            state.autoTunnelSettings.copy(isStopOnServerUnreachableEnabled = to)
+        )
+    }
+
     fun saveTrustedNetworkName(name: String) = intent {
         if (name.isEmpty()) return@intent
         val trimmed = name.trim()

@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.zaneschepke.networkmonitor.AndroidNetworkMonitor
 import com.zaneschepke.networkmonitor.StableNetworkEngine
+import com.zaneschepke.tunnel.Tunnel
 import com.zaneschepke.wireguardautotunnel.R
 import com.zaneschepke.wireguardautotunnel.core.orchestration.TunnelCoordinator
 import com.zaneschepke.wireguardautotunnel.di.Dispatcher
@@ -67,6 +68,7 @@ class AutoTunnelService : LifecycleService() {
     private var permissionsJob: Job? = null
     private var overridesJob: Job? = null
     private var noInternetStopJob: Job? = null
+    private var serverUnreachableJob: Job? = null
 
     private data class PermissionWarningState(
         val detectionMethod: AndroidNetworkMonitor.WifiDetectionMethod,
@@ -124,6 +126,8 @@ class AutoTunnelService : LifecycleService() {
         permissionsJob = startLocationPermissionsNotificationJob()
         overridesJob?.cancel()
         overridesJob = startUserOverrideJob()
+        serverUnreachableJob?.cancel()
+        serverUnreachableJob = startServerUnreachableJob()
     }
 
     fun stop() {
@@ -133,6 +137,7 @@ class AutoTunnelService : LifecycleService() {
 
     override fun onDestroy() {
         cancelNoInternetStopJob()
+        serverUnreachableJob?.cancel()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stateHolder.setActive(false)
         AutoTunnelTileRefresher.refresh(this)
@@ -359,6 +364,33 @@ class AutoTunnelService : LifecycleService() {
             AutoTunnelEvent.DoNothing -> Unit
         }
     }
+
+    private fun startServerUnreachableJob(): Job =
+        lifecycleScope.launch(ioDispatcher) {
+            combine(
+                    tunnelCoordinator.backendStatus,
+                    autoTunnelRepository.flow,
+                ) { status, settings ->
+                    status to settings
+                }
+                .collect { (status, settings) ->
+                    if (!settings.isStopOnServerUnreachableEnabled) return@collect
+
+                    status.activeTunnels.forEach { (tunnelId, activeTunnel) ->
+                        if (activeTunnel.transportState is Tunnel.State.Up.HandshakeFailure) {
+                            Timber.w(
+                                "Server unreachable (handshake failure) for tunnel $tunnelId — stopping tunnel"
+                            )
+                            reconciliationMutex.withLock {
+                                tunnelCoordinator.stopTunnel(
+                                    tunnelId,
+                                    TunnelActionSource.AUTO_TUNNEL,
+                                )
+                            }
+                        }
+                    }
+                }
+        }
 
     companion object {
         private const val NO_INTERNET_GRACE_PERIOD_MS = 10_000L

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PublicOff
+import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.SettingsEthernet
 import androidx.compose.material.icons.outlined.SignalCellular4Bar
@@ -314,6 +315,24 @@ fun AutoTunnelScreen(
                 onClick = {
                     viewModel.setStopOnNoInternetEnabled(
                         !uiState.autoTunnelSettings.isStopOnNoInternetEnabled
+                    )
+                },
+            )
+            SurfaceRow(
+                leading = { Icon(Icons.Outlined.WifiOff, contentDescription = null) },
+                title = stringResource(R.string.stop_on_server_unreachable),
+                description = {
+                    DescriptionText(stringResource(R.string.stop_on_server_unreachable_desc))
+                },
+                trailing = {
+                    ThemedSwitch(
+                        checked = uiState.autoTunnelSettings.isStopOnServerUnreachableEnabled,
+                        onClick = { viewModel.setStopOnServerUnreachableEnabled(it) },
+                    )
+                },
+                onClick = {
+                    viewModel.setStopOnServerUnreachableEnabled(
+                        !uiState.autoTunnelSettings.isStopOnServerUnreachableEnabled
                     )
                 },
             )
